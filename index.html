@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gamified CTF Quiz</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 - Deep Blue */
+            color: #f8fafc; /* Slate 50 - Off-White */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container-card {
+            background-color: #1e293b; /* Slate 800 - Dark Card */
+            border: 1px solid #334155; /* Slate 700 border */
+            animation: fadeIn 0.5s ease-out;
+        }
+        /* Custom spinner for loading state */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #f97316; /* Orange 500 */
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- Gamified Effects --- */
+        .correct-feedback {
+            background-color: #16a34a; /* Green 600 */
+            color: white;
+            animation: flashGreen 0.3s ease-in-out;
+        }
+        .incorrect-feedback {
+            background-color: #dc2626; /* Red 600 */
+            color: white;
+            animation: flashRed 0.3s ease-in-out;
+        }
+        @keyframes flashGreen {
+            0% { box-shadow: 0 0 10px #86efac; }
+            50% { box-shadow: 0 0 20px #4ade80; }
+            100% { box-shadow: none; }
+        }
+        @keyframes flashRed {
+            0% { box-shadow: 0 0 10px #fca5a5; }
+            50% { box-shadow: 0 0 20px #f87171; }
+            100% { box-shadow: none; }
+        }
+
+        .correct-text { color: #4ade80; }
+        .incorrect-text { color: #f87171; }
+
+        .mc-option input:checked + label {
+            background-color: #3b82f6; /* Blue 500 */
+            border-color: #3b82f6;
+        }
+        .mc-option label {
+            transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .mc-option label:hover:not(.correct):not(.incorrect) {
+            border-color: #6366f1; /* Indigo 500 */
+            box-shadow: 0 0 5px #6366f1;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div id="app" class="w-full max-w-2xl container-card p-6 md:p-8 rounded-xl shadow-2xl transition-all duration-300">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center mb-6 text-indigo-400">
+            CTF Data Analysis Challenge
+        </h1>
+
+        <!-- Scoreboard and Progress -->
+        <div class="mb-6">
+            <!-- Score & High Score -->
+            <div class="flex justify-between items-center mb-4 p-4 rounded-xl bg-slate-700 shadow-lg border border-slate-600">
+                <div class="text-center">
+                    <span class="text-sm font-medium text-slate-400">Score</span>
+                    <p id="current-score" class="text-3xl font-extrabold text-green-400 transition-colors">0</p>
+                </div>
+                <div class="text-center">
+                    <span class="text-sm font-medium text-slate-400">High Score</span>
+                    <p id="high-score" class="text-3xl font-extrabold text-yellow-400 flex items-center justify-center">
+                        <div id="score-loader" class="spinner"></div>
+                    </p>
+                </div>
+                <div class="text-center">
+                    <span class="text-sm font-medium text-slate-400">Question</span>
+                    <p id="question-counter" class="text-3xl font-extrabold text-cyan-400">1 / 27</p>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="h-3 bg-slate-700 rounded-full overflow-hidden shadow-inner">
+                <div id="progress-bar" class="h-full bg-indigo-500 transition-all duration-300 ease-out" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Quiz Content -->
+        <div id="quiz-content" class="min-h-[250px] flex flex-col justify-between">
+            <!-- Question Display -->
+            <div id="question-card" class="mb-6 p-4 md:p-6 bg-slate-700 rounded-xl shadow-lg border-l-4 border-indigo-500 transition-all">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="text-xl font-bold text-indigo-300">Question <span id="q-num">1</span></p>
+                    <p class="text-xl font-bold text-yellow-400"><span id="q-score">5</span> pts</p>
+                </div>
+                <p id="question-text" class="text-lg font-semibold text-slate-200">
+                    Loading question...
+                </p>
+                <!-- Hint Section (Toggleable) -->
+                <button id="hint-toggle" onclick="toggleHint()"
+                    class="mt-4 text-sm text-slate-400 hover:text-orange-400 transition-colors focus:outline-none">
+                    [ Show Hint ]
+                </button>
+                <div id="hint-section" class="hidden mt-3 p-3 text-sm italic rounded-lg bg-slate-600 border border-slate-500 text-slate-300 transition-all duration-300">
+                    <span class="font-bold text-orange-300">Hint: </span><span id="hint-text"></span>
+                </div>
+            </div>
+
+            <!-- Input Area (Dynamically changes) -->
+            <div id="input-area" class="mb-6">
+                <!-- Inputs will be injected here -->
+            </div>
+
+            <!-- Feedback Message -->
+            <p id="feedback-message" class="text-center text-xl font-extrabold mb-4 min-h-[1.5em] transition-colors duration-300"></p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="flex justify-center space-x-4">
+            <button id="check-button" onclick="checkAnswer()" disabled
+                class="button-primary px-8 py-3 bg-green-600 text-white font-bold rounded-lg shadow-xl shadow-green-900/50 hover:bg-green-700 disabled:bg-gray-500 disabled:shadow-none disabled:cursor-not-allowed transition-all">
+                HACK (Check Answer)
+            </button>
+            <button id="next-button" onclick="nextQuestion()" disabled
+                class="button-primary px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-xl shadow-indigo-900/50 hover:bg-indigo-700 disabled:bg-gray-500 disabled:shadow-none disabled:cursor-not-allowed hidden transition-all">
+                Next Target &rarr;
+            </button>
+            <button id="restart-button" onclick="startQuiz()"
+                class="button-primary px-8 py-3 bg-red-600 text-white font-bold rounded-lg shadow-xl shadow-red-900/50 hover:bg-red-700 disabled:bg-gray-500 disabled:shadow-none disabled:cursor-not-allowed hidden transition-all">
+                Reset Simulation
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Custom Modal for End Game/Alerts -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center p-4 z-50">
+        <div id="modal-content" class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-4 border-indigo-400">
+            <h3 id="modal-title" class="text-3xl font-extrabold mb-4 text-indigo-400">Quiz Complete!</h3>
+            <p id="modal-body" class="mb-6 text-xl text-slate-200">Your final score is 0.</p>
+            <button onclick="closeModal()" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors">Confirm</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase access
+        window.db = null;
+        window.auth = null;
+        window.userId = null;
+        window.isAuthReady = false;
+
+        // Global variables defined by Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Set Firestore log level to debug for development
+        setLogLevel('Debug');
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase configuration is missing.");
+                showModal("Error", "Firebase configuration is missing. Cannot save high score.");
+                window.isAuthReady = true;
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            window.db = getFirestore(app);
+            window.auth = getAuth(app);
+
+            // 1. Initial Authentication
+            const user = await new Promise(resolve => {
+                const unsubscribe = onAuthStateChanged(window.auth, (user) => {
+                    unsubscribe(); // Stop listening after the first event
+                    resolve(user);
+                });
+            });
+
+            if (user) {
+                window.userId = user.uid;
+            } else {
+                try {
+                    if (initialAuthToken) {
+                        const credential = await signInWithCustomToken(window.auth, initialAuthToken);
+                        window.userId = credential.user.uid;
+                    } else {
+                        const credential = await signInAnonymously(window.auth);
+                        window.userId = credential.user.uid;
+                    }
+                } catch (error) {
+                    console.error("Firebase Auth Error:", error);
+                    window.userId = crypto.randomUUID(); // Fallback to random ID if auth fails
+                }
+            }
+
+            window.isAuthReady = true;
+            console.log("Firebase Auth Ready. User ID:", window.userId);
+            window.setupScoreListener();
+            window.startQuiz(); // Start the quiz once authenticated
+        }
+
+        window.setupScoreListener = function() {
+            if (!window.db || !window.userId) return;
+
+            const scoreRef = doc(window.db, `artifacts/${appId}/users/${window.userId}/quizScores/highScore`);
+            
+            // Show loader while fetching
+            document.getElementById('high-score').innerHTML = '<div id="score-loader" class="spinner mx-auto"></div>';
+
+
+            // Listen for high score changes in real-time
+            onSnapshot(scoreRef, (docSnap) => {
+                const highScoreElement = document.getElementById('high-score');
+                document.getElementById('score-loader')?.remove(); // Remove spinner
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    window.currentHighScore = data.score || 0;
+                    highScoreElement.textContent = window.currentHighScore;
+                } else {
+                    // Document doesn't exist, set high score to 0
+                    window.currentHighScore = 0;
+                    highScoreElement.textContent = 0;
+                }
+            }, (error) => {
+                console.error("Error setting up score listener:", error);
+                // Non-critical, continue with score 0
+                window.currentHighScore = 0;
+                document.getElementById('high-score').textContent = 0;
+            });
+        }
+
+        window.saveHighScore = async function(newScore) {
+            if (!window.db || !window.userId) {
+                console.warn("Firestore not ready. Cannot save score.");
+                return;
+            }
+
+            if (newScore > window.currentHighScore) {
+                const scoreRef = doc(window.db, `artifacts/${appId}/users/${window.userId}/quizScores/highScore`);
+                try {
+                    await setDoc(scoreRef, { score: newScore, updated: new Date().toISOString() });
+                    window.currentHighScore = newScore; // Update local high score immediately
+                } catch (e) {
+                    console.error("Error saving high score: ", e);
+                }
+            }
+        }
+
+        // Initialize Firebase on load
+        window.onload = initFirebase;
+    </script>
+
+    <script>
+        // --- QUIZ DATA (All 27 Questions) ---
+        const quizData = [
+            {
+                id: 1,
+                question: "The vulnerability **SMB Null Session Allowed (H3-2020-0007)** on which host is classified as a CRITICAL severity with a Context Score of 10.0 due to its proven impact, unlike the LOW severity finding on kingslanding.sevenkingdoms.local?",
+                answer: "winterfell.north.sevenkingdoms.local",
+                score: 5,
+                hint: "A key administrative server in the North.",
+                type: "Multiple choice"
+            },
+            {
+                id: 2,
+                question: "For the host winterfell.north.sevenkingdoms.local (192.168.57.11), the remediation of the SMB Null Session Allowed weakness (H3-2020-0007) would potentially eliminate what percentage of critical impact paths?",
+                answer: "68",
+                score: 5,
+                hint: "The value is a two-digit number. Do not include the % sign.",
+                type: "Free text"
+            },
+            {
+                id: 3,
+                question: "The weakness Credential Dumping - Local Security Authority Subsystem Service (LSASS) Memory (H3-2021-0044) on castelblack.north.sevenkingdoms.local has a Critical Context Score of 10.02. What percentage of critical impact paths would be eliminated if this weakness were remediated?",
+                answer: "30",
+                score: 4,
+                hint: "The value is a two-digit number. Do not include the % sign.",
+                type: "Free text"
+            },
+            {
+                id: 4,
+                question: "The Weak or Default Credentials - Cracked Credentials weakness (H3-2021-0020) for user **missandei** has a Critical Context Score of 10.02 and was linked to a Domain Compromise in what domain?",
+                answer: "ESSOS.LOCAL",
+                score: 4,
+                hint: "Ensure the domain name is in capital letters.",
+                type: "Free text"
+            },
+            {
+                id: 5,
+                question: "What is the explicit risk mentioned in the BusinessRisks column for the compromise of Domain Admin **eddard.stark** in the NORTH.SEVENKINGDOMS.LOCAL domain?",
+                answer: "Operational Disruption",
+                score: 3,
+                hint: "Relates to the continuation of normal business functions.",
+                type: "Multiple choice"
+            },
+            {
+                id: 6,
+                question: "The host **dragonstone.sevenkingdoms.local** (192.168.57.17) is the only asset that currently has the **Weak or Default Credentials - Cached Credentials** (H3-2021-0017) weakness. What is the severity?",
+                answer: "CRITICAL",
+                score: 3,
+                hint: "The highest possible severity level.",
+                type: "Free text"
+            },
+            {
+                id: 7,
+                question: "The remediation of the weakness **Kerberoasting - Service Principal Name (SPN) Found** (H3-2020-0003) on meereen.essos.local (192.168.57.18) would potentially eliminate what percentage of critical impact paths?",
+                answer: "100",
+                score: 5,
+                hint: "This remediation completely removes all critical paths linked to this asset. Do not include the % sign.",
+                type: "Free text"
+            },
+            {
+                id: 8,
+                question: "The Credential Dumping - Local Security Authority Subsystem Service (LSASS) Memory (H3-2021-0044) on **castelblack.north.sevenkingdoms.local** is linked to Critical Sensitive Data Exposure impact via which mechanism?",
+                answer: "SMB Share Read Access",
+                score: 4,
+                hint: "Involves unauthorized access to file sharing resources.",
+                type: "Multiple choice"
+            },
+            {
+                id: 9,
+                question: "The compromised Domain Admin credential for **tyrion.lannister** in the WESTERLANDS.LOCAL domain was linked to a Critical Sensitive Data Exposure via what primary method?",
+                answer: "SMB Share Read Access",
+                score: 4,
+                hint: "The same mechanism found in question 8.",
+                type: "Multiple choice"
+            },
+            {
+                id: 10,
+                question: "Which credential has a hash type of **kerb_asrep_hash** and is associated with the Domain User **viserys.targaryen**?",
+                answer: "viserys.targaryen",
+                score: 3,
+                hint: "The name belongs to a Targaryen sibling.",
+                type: "Multiple choice"
+            },
+            {
+                id: 11,
+                question: "The Domain Admin **tyrion.lannister** has a Critical Context Score of 10.02, linked to an Operational Disruption. What domain is this user in?",
+                answer: "WESTERLANDS.LOCAL",
+                score: 3,
+                hint: "The region associated with the Lannister family.",
+                type: "Free text"
+            },
+            {
+                id: 12,
+                question: "What is the critical impact path percentage that would be eliminated if the **Active Directory Certificate Services - EDITF_ATTRIBUTESUBJECTALTNAME2 flag set** (H3-2022-0022) weakness on meereen.essos.local were remediated?",
+                answer: "100",
+                score: 5,
+                hint: "This is another weakness that removes all critical impact paths for the asset.",
+                type: "Free text"
+            },
+            {
+                id: 13,
+                question: "The host **dragonstone.sevenkingdoms.local** (192.168.57.17) has two weaknesses with a Critical Context Score: Weak or Default Credentials - Cached Credentials and Weak or Default Credentials - Cracked Credentials. Which user is associated with the **Cracked Credentials** weakness?",
+                answer: "daemon.targaryen",
+                score: 3,
+                hint: "A famous early Targaryen prince.",
+                type: "Multiple choice"
+            },
+            {
+                id: 14,
+                question: "The weakness **Kerberoasting - Service Principal Name (SPN) Found** (H3-2020-0003) on meereen.essos.local has a Critical Context Score of 10.02 and is linked to what critical Business Risk?",
+                answer: "Domain Compromise",
+                score: 4,
+                hint: "The highest possible impact to the Active Directory environment.",
+                type: "Multiple choice"
+            },
+            {
+                id: 15,
+                question: "The user **daenerys.targaryen** (Domain Admin) was compromised in which domain?",
+                answer: "ESSOS.LOCAL",
+                score: 3,
+                hint: "The continent where she spent her early years.",
+                type: "Free text"
+            },
+            {
+                id: 16,
+                question: "Which host is mentioned as the Domain Controller for the **NORTH.SEVENKINGDOMS.LOCAL** domain?",
+                answer: "winterfell.north.sevenkingdoms.local",
+                score: 3,
+                hint: "The primary administrative seat of the North.",
+                type: "Multiple choice"
+            },
+            {
+                id: 17,
+                question: "The weakness **Weak or Default Credentials - Cracked Credentials** (H3-2021-0020) for user **jonsnow** (Local User) is on which host?",
+                answer: "castelblack.north.sevenkingdoms.local",
+                score: 3,
+                hint: "The headquarters of the Night's Watch.",
+                type: "Multiple choice"
+            },
+            {
+                id: 18,
+                question: "What is the primary **Credential Source** type listed for the compromised Domain Admin **robb.stark**?",
+                answer: "implant_dump_lsass",
+                score: 3,
+                hint: "The technique involves extracting data via a memory dump.",
+                type: "Multiple choice"
+            },
+            {
+                id: 19,
+                question: "The Local User **jonsnow** was compromised on **castelblack.north.sevenkingdoms.local** (192.168.57.22) and has read/write access to what specific SMB Share on this host, leading to a Critical Sensitive Data Exposure impact (Score 9.6)?",
+                answer: "local_data",
+                score: 3,
+                hint: "This share name is generic and indicates local information.",
+                type: "Multiple choice"
+            },
+            {
+                id: 20,
+                question: "The compromised Domain Admin **jaime.lannister** was found on which host via CredType **STANDARD**?",
+                answer: "kingslanding.sevenkingdoms.local",
+                score: 3,
+                hint: "The capital city of the Seven Kingdoms.",
+                type: "Multiple choice"
+            },
+            {
+                id: 21,
+                question: "The credential for Local User **guest** on **castelblack.north.sevenkingdoms.local** (192.168.57.22) has read/write access to what specific SMB Share on this host, leading to a Critical Sensitive Data Exposure impact (Score 9.6)?",
+                answer: "all",
+                score: 3,
+                hint: "This share grants access to every shared directory.",
+                type: "Multiple choice"
+            },
+            {
+                id: 22,
+                question: "Which credential, besides **missandei**, derived its hash from the **kerb_asrep_hash** type?",
+                answer: "brandon.stark",
+                score: 3,
+                hint: "A younger member of the Stark family.",
+                type: "Multiple choice"
+            },
+            {
+                id: 23,
+                question: "The compromised Domain User **sql.svc** (CredType: STANDARD, CredSource: implant_dump_lsass) on **braavos.essos.local** was linked to a Critical Sensitive Data Exposure on which specific SMB Share of the Domain Controller **meereen.essos.local**?",
+                answer: "SYSVOL",
+                score: 4,
+                hint: "The share containing Group Policy objects and scripts.",
+                type: "Multiple choice"
+            },
+            {
+                id: 24,
+                question: "What is the mandatory role for an account to be able to dump the Security Account Manager (SAM) database and retrieve local user NTLM hashes?",
+                answer: "Administrative privileges",
+                score: 3,
+                hint: "Requires elevated system permissions.",
+                type: "Multiple choice"
+            },
+            {
+                id: 25,
+                question: "Which credential contains the AWS Access Key ID **AKIAYEKP5OS3CHPA5BCO**?",
+                answer: "AKIAYEKP5OS3CHPA5BCO",
+                score: 4,
+                hint: "The answer is the key ID itself.",
+                type: "Multiple choice"
+            },
+            {
+                id: 26,
+                question: "What is the minimum recommended minimum password length (in characters) mentioned in the remediation details for cracking and reuse-related weaknesses?",
+                answer: "12",
+                score: 3,
+                hint: "A common security standard for strong passwords.",
+                type: "Free text"
+            },
+            {
+                id: 27,
+                question: "Which Threat Actor is explicitly listed as exploiting the Active Directory Certificate Services - EDITF_ATTRIBUTESUBJECTALTNAME2 flag set weakness (H3-2022-0022)?",
+                answer: "WIZARD_SPIDER",
+                score: 4,
+                hint: "The group's name includes a magical creature and an arthropod.",
+                type: "Free text"
+            }
+        ];
+
+        // --- GLOBAL QUIZ STATE ---
+        let currentQuestionIndex = 0;
+        let totalScore = 0;
+        let isAnswerChecked = false;
+        let totalQuestions = quizData.length;
+
+        // Function to shuffle an array
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // --- MULTIPLE CHOICE LOGIC ---
+
+        // A curated list of plausible but incorrect answers for Multiple Choice questions
+        const incorrectAnswerPool = [
+            "essos.local", "braavos.essos.local", "westerlands.local", "cailin.sevenkingdoms.local",
+            "cersei.lannister", "jamie.lannister", "aegon.targaryen", "robert.baratheon",
+            "75", "50", "10", "20", "45", "90",
+            "Sensitive Data Exposure", "Financial Loss", "Loss of Integrity", "DDoS Attack",
+            "SAM Dump", "Registry Access", "Cached Credentials", "Local Privilege Escalation",
+            "16", "8", "10", "15", "HIGH", "MEDIUM", "LOW", "SYSVOL", "NETLOGON", "USERS",
+            "AKIAI54YTHH3C90L8OP1", "AKIAJ50E4OP2B71X90C8", "ROTTEN_SPIDER", "LUCKY_CAT"
+        ];
+
+        function getIncorrectChoices(correctAnswer, count = 3) {
+            const potentialIncorrects = incorrectAnswerPool.filter(a => a.toLowerCase() !== correctAnswer.toLowerCase());
+
+            // Add the correct answer's domain/host/name parts if they are simple, common words
+            const correctParts = correctAnswer.split(/[.\s]/).filter(p => p.length > 2);
+            potentialIncorrects.push(...correctParts);
+
+            // Filter out duplicates and the correct answer again
+            const uniqueIncorrects = [...new Set(potentialIncorrects)].filter(a => a.toLowerCase() !== correctAnswer.toLowerCase());
+
+            // Shuffle and return the desired count
+            shuffleArray(uniqueIncorrects);
+            return uniqueIncorrects.slice(0, count);
+        }
+
+        // --- UI UTILITY FUNCTIONS ---
+
+        function showModal(title, body) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').innerHTML = body;
+            document.getElementById('modal-backdrop').classList.remove('hidden');
+            document.getElementById('modal-backdrop').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('modal-backdrop').classList.add('hidden');
+            document.getElementById('modal-backdrop').classList.remove('flex');
+        }
+
+        function toggleHint() {
+            const hintSection = document.getElementById('hint-section');
+            const hintToggle = document.getElementById('hint-toggle');
+            if (hintSection.classList.contains('hidden')) {
+                hintSection.classList.remove('hidden');
+                hintToggle.textContent = "[ Hide Hint ]";
+            } else {
+                hintSection.classList.add('hidden');
+                hintToggle.textContent = "[ Show Hint ]";
+            }
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('current-score').textContent = totalScore;
+            document.getElementById('question-counter').textContent = `${currentQuestionIndex + 1} / ${totalQuestions}`;
+            const progress = ((currentQuestionIndex) / totalQuestions) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+        
+        function updateProgressOnCheck() {
+             const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+
+        function startQuiz() {
+            currentQuestionIndex = 0;
+            totalScore = 0;
+            isAnswerChecked = false;
+
+            // Hide end-game/restart button
+            document.getElementById('restart-button').classList.add('hidden');
+            document.getElementById('next-button').classList.add('hidden');
+            document.getElementById('check-button').classList.remove('hidden');
+
+            document.getElementById('feedback-message').textContent = '';
+            document.getElementById('question-card').classList.remove('correct-feedback', 'incorrect-feedback');
+
+            shuffleArray(quizData); // Shuffle questions for replayability!
+            totalQuestions = quizData.length;
+
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= totalQuestions) {
+                endQuiz();
+                return;
+            }
+
+            const question = quizData[currentQuestionIndex];
+            isAnswerChecked = false;
+
+            // 1. Reset Visuals & Update Header
+            updateScoreDisplay();
+            document.getElementById('question-card').classList.remove('correct-feedback', 'incorrect-feedback');
+
+            // 2. Update Question Text
+            document.getElementById('q-num').textContent = currentQuestionIndex + 1;
+            document.getElementById('q-score').textContent = question.score;
+            document.getElementById('question-text').innerHTML = `${question.question}`;
+
+            // 3. Update Hint
+            const hintSection = document.getElementById('hint-section');
+            const hintToggle = document.getElementById('hint-toggle');
+            if (question.hint) {
+                document.getElementById('hint-text').textContent = question.hint;
+                hintSection.classList.add('hidden'); // Ensure hidden on load
+                hintToggle.classList.remove('hidden');
+                hintToggle.textContent = "[ Show Hint ]";
+            } else {
+                hintSection.classList.add('hidden');
+                hintToggle.classList.add('hidden');
+            }
+
+            // 4. Generate Input Area
+            const inputArea = document.getElementById('input-area');
+            inputArea.innerHTML = ''; // Clear previous input
+
+            const checkButton = document.getElementById('check-button');
+
+            if (question.type === "Free text") {
+                inputArea.innerHTML = `
+                    <input type="text" id="user-answer" placeholder="Enter the exact answer..."
+                        class="w-full p-4 text-lg rounded-lg bg-slate-600 border border-slate-500 focus:ring-orange-500 focus:border-orange-500 text-slate-100 transition-colors"
+                        oninput="document.getElementById('check-button').disabled = this.value.trim().length === 0">
+                `;
+                checkButton.disabled = true; // Initially disabled until text is typed
+            } else if (question.type === "Multiple choice") {
+                const choices = [question.answer, ...getIncorrectChoices(question.answer, 3)];
+                shuffleArray(choices); // Shuffle choices
+
+                inputArea.innerHTML = choices.map((choice, index) => `
+                    <div class="mc-option mb-2">
+                        <input type="radio" id="choice-${index}" name="quiz-choice" value="${choice}" class="hidden peer"
+                            onchange="document.getElementById('check-button').disabled = false;">
+                        <label for="choice-${index}"
+                            class="block w-full p-3 border-2 border-slate-600 rounded-lg text-slate-100 cursor-pointer transition-colors duration-150
+                            bg-slate-700 hover:bg-slate-600 hover:border-indigo-400">
+                            ${choice}
+                        </label>
+                    </div>
+                `).join('');
+                checkButton.disabled = true; // Initially disabled until a choice is made
+            }
+
+            // 5. Update Buttons
+            document.getElementById('check-button').classList.remove('hidden');
+            document.getElementById('next-button').classList.add('hidden');
+            document.getElementById('restart-button').classList.add('hidden');
+            document.getElementById('feedback-message').textContent = '';
+        }
+
+        // --- GAME LOGIC ---
+
+        function checkAnswer() {
+            if (isAnswerChecked) return;
+
+            const question = quizData[currentQuestionIndex];
+            let userAnswer = '';
+            let isCorrect = false;
+
+            // 1. Get User Answer
+            if (question.type === "Free text") {
+                const inputElement = document.getElementById('user-answer');
+                if (inputElement) {
+                    userAnswer = inputElement.value.trim();
+                    // Use localeCompare for robust case-insensitive comparison
+                    isCorrect = question.answer.localeCompare(userAnswer, undefined, { sensitivity: 'base' }) === 0;
+
+                    // Highlight input
+                    inputElement.classList.remove('bg-slate-600', 'border-slate-500', 'focus:ring-orange-500', 'focus:border-orange-500');
+                    if (isCorrect) {
+                        inputElement.classList.add('correct');
+                    } else {
+                        inputElement.classList.add('incorrect');
+                    }
+                }
+            } else if (question.type === "Multiple choice") {
+                const selectedRadio = document.querySelector('input[name="quiz-choice"]:checked');
+                if (selectedRadio) {
+                    userAnswer = selectedRadio.value;
+                    isCorrect = userAnswer === question.answer;
+
+                    // Highlight all options
+                    const options = document.querySelectorAll('input[name="quiz-choice"]');
+                    options.forEach(input => {
+                        const label = input.nextElementSibling;
+                        label.classList.remove('hover:bg-slate-600', 'hover:border-indigo-400');
+                        input.disabled = true; // Disable further selection
+
+                        if (input.value === question.answer) {
+                            label.classList.add('correct');
+                        } else if (input.checked && !isCorrect) {
+                            label.classList.add('incorrect');
+                        }
+                    });
+                }
+            }
+
+            // Don't proceed if no answer was selected/entered
+            if ((question.type === "Multiple choice" && !document.querySelector('input[name="quiz-choice"]:checked')) ||
+                (question.type === "Free text" && userAnswer.length === 0)) {
+                return;
+            }
+
+            isAnswerChecked = true;
+
+            // 2. Provide Feedback & Update Score
+            const feedbackElement = document.getElementById('feedback-message');
+            const cardElement = document.getElementById('question-card');
+            cardElement.classList.remove('correct-feedback', 'incorrect-feedback');
+
+            if (isCorrect) {
+                totalScore += question.score;
+                feedbackElement.textContent = `ACCESS GRANTED! +${question.score} Points.`;
+                feedbackElement.classList.add('correct-text');
+                feedbackElement.classList.remove('incorrect-text');
+                cardElement.classList.add('correct-feedback');
+            } else {
+                let message = "ACCESS DENIED. Incorrect.";
+                message += ` Correct Answer: ${question.answer}`;
+                feedbackElement.textContent = message;
+                feedbackElement.classList.add('incorrect-text');
+                feedbackElement.classList.remove('correct-text');
+                cardElement.classList.add('incorrect-feedback');
+            }
+            
+            updateScoreDisplay(); // Update Score in header
+            updateProgressOnCheck(); // Advance progress bar
+
+            // 3. Transition Buttons
+            document.getElementById('check-button').classList.add('hidden');
+            document.getElementById('next-button').classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < totalQuestions) {
+                loadQuestion();
+            } else {
+                endQuiz();
+            }
+        }
+
+        function endQuiz() {
+            // Save score to Firestore (handles the high score logic internally)
+            if (window.saveHighScore) {
+                 window.saveHighScore(totalScore);
+            }
+
+            const isNewHighScore = totalScore > (window.currentHighScore || 0);
+
+            const title = "Simulation Complete!";
+            const body = `
+                <p class="mb-2 text-xl">Final Score: <span class="text-green-400 font-bold text-3xl">${totalScore}</span></p>
+                ${isNewHighScore ? '<p class="text-yellow-400 font-extrabold text-2xl mt-4 animate-pulse">*** NEW HIGH SCORE ACHIEVED! ***</p>' : ''}
+                <p class="text-sm text-slate-400 mt-4">You analyzed ${totalQuestions} threat data points.</p>
+            `;
+
+            showModal(title, body);
+
+            // Hide action buttons, show restart
+            document.getElementById('check-button').classList.add('hidden');
+            document.getElementById('next-button').classList.add('hidden');
+            document.getElementById('restart-button').classList.remove('hidden');
+
+            // Reset counter to final state
+            document.getElementById('question-counter').textContent = `${totalQuestions} / ${totalQuestions}`;
+        }
+    </script>
+</body>
+</html>
