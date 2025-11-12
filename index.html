@@ -22,19 +22,8 @@
             border: 1px solid #334155; /* Slate 700 border */
             animation: fadeIn 0.5s ease-out;
         }
-        /* Custom spinner for loading state */
-        .spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-top: 4px solid #f97316; /* Orange 500 */
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        /* Removed spinner CSS as High Score is gone */
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -87,17 +76,11 @@
 
         <!-- Scoreboard and Progress -->
         <div class="mb-6">
-            <!-- Score & High Score -->
-            <div class="flex justify-between items-center mb-4 p-4 rounded-xl bg-slate-700 shadow-lg border border-slate-600">
+            <!-- Score & Question Counter -->
+            <div class="flex justify-around items-center mb-4 p-4 rounded-xl bg-slate-700 shadow-lg border border-slate-600">
                 <div class="text-center">
-                    <span class="text-sm font-medium text-slate-400">Score</span>
+                    <span class="text-sm font-medium text-slate-400">Current Score</span>
                     <p id="current-score" class="text-3xl font-extrabold text-green-400 transition-colors">0</p>
-                </div>
-                <div class="text-center">
-                    <span class="text-sm font-medium text-slate-400">High Score</span>
-                    <p id="high-score" class="text-3xl font-extrabold text-yellow-400 flex items-center justify-center">
-                        <div id="score-loader" class="spinner"></div>
-                    </p>
                 </div>
                 <div class="text-center">
                     <span class="text-sm font-medium text-slate-400">Question</span>
@@ -168,121 +151,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Global variables for Firebase access
-        window.db = null;
-        window.auth = null;
-        window.userId = null;
-        window.isAuthReady = false;
-
-        // Global variables defined by Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Set Firestore log level to debug for development
-        setLogLevel('Debug');
-
-        async function initFirebase() {
-            if (!firebaseConfig) {
-                console.error("Firebase configuration is missing.");
-                showModal("Error", "Firebase configuration is missing. Cannot save high score.");
-                window.isAuthReady = true;
-                return;
-            }
-
-            const app = initializeApp(firebaseConfig);
-            window.db = getFirestore(app);
-            window.auth = getAuth(app);
-
-            // 1. Initial Authentication
-            const user = await new Promise(resolve => {
-                const unsubscribe = onAuthStateChanged(window.auth, (user) => {
-                    unsubscribe(); // Stop listening after the first event
-                    resolve(user);
-                });
-            });
-
-            if (user) {
-                window.userId = user.uid;
-            } else {
-                try {
-                    if (initialAuthToken) {
-                        const credential = await signInWithCustomToken(window.auth, initialAuthToken);
-                        window.userId = credential.user.uid;
-                    } else {
-                        const credential = await signInAnonymously(window.auth);
-                        window.userId = credential.user.uid;
-                    }
-                } catch (error) {
-                    console.error("Firebase Auth Error:", error);
-                    window.userId = crypto.randomUUID(); // Fallback to random ID if auth fails
-                }
-            }
-
-            window.isAuthReady = true;
-            console.log("Firebase Auth Ready. User ID:", window.userId);
-            window.setupScoreListener();
-            window.startQuiz(); // Start the quiz once authenticated
-        }
-
-        window.setupScoreListener = function() {
-            if (!window.db || !window.userId) return;
-
-            const scoreRef = doc(window.db, `artifacts/${appId}/users/${window.userId}/quizScores/highScore`);
-            
-            // Show loader while fetching
-            document.getElementById('high-score').innerHTML = '<div id="score-loader" class="spinner mx-auto"></div>';
-
-
-            // Listen for high score changes in real-time
-            onSnapshot(scoreRef, (docSnap) => {
-                const highScoreElement = document.getElementById('high-score');
-                document.getElementById('score-loader')?.remove(); // Remove spinner
-
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    window.currentHighScore = data.score || 0;
-                    highScoreElement.textContent = window.currentHighScore;
-                } else {
-                    // Document doesn't exist, set high score to 0
-                    window.currentHighScore = 0;
-                    highScoreElement.textContent = 0;
-                }
-            }, (error) => {
-                console.error("Error setting up score listener:", error);
-                // Non-critical, continue with score 0
-                window.currentHighScore = 0;
-                document.getElementById('high-score').textContent = 0;
-            });
-        }
-
-        window.saveHighScore = async function(newScore) {
-            if (!window.db || !window.userId) {
-                console.warn("Firestore not ready. Cannot save score.");
-                return;
-            }
-
-            if (newScore > window.currentHighScore) {
-                const scoreRef = doc(window.db, `artifacts/${appId}/users/${window.userId}/quizScores/highScore`);
-                try {
-                    await setDoc(scoreRef, { score: newScore, updated: new Date().toISOString() });
-                    window.currentHighScore = newScore; // Update local high score immediately
-                } catch (e) {
-                    console.error("Error saving high score: ", e);
-                }
-            }
-        }
-
-        // Initialize Firebase on load
-        window.onload = initFirebase;
-    </script>
+    <!-- Removed Firebase SDK and setup script -->
 
     <script>
         // --- QUIZ DATA (All 27 Questions) ---
@@ -766,17 +635,11 @@
         }
 
         function endQuiz() {
-            // Save score to Firestore (handles the high score logic internally)
-            if (window.saveHighScore) {
-                 window.saveHighScore(totalScore);
-            }
-
-            const isNewHighScore = totalScore > (window.currentHighScore || 0);
+            // Note: High score logic removed. Total score is the final result.
 
             const title = "Simulation Complete!";
             const body = `
                 <p class="mb-2 text-xl">Final Score: <span class="text-green-400 font-bold text-3xl">${totalScore}</span></p>
-                ${isNewHighScore ? '<p class="text-yellow-400 font-extrabold text-2xl mt-4 animate-pulse">*** NEW HIGH SCORE ACHIEVED! ***</p>' : ''}
                 <p class="text-sm text-slate-400 mt-4">You analyzed ${totalQuestions} threat data points.</p>
             `;
 
@@ -790,6 +653,9 @@
             // Reset counter to final state
             document.getElementById('question-counter').textContent = `${totalQuestions} / ${totalQuestions}`;
         }
+
+        // Initialize quiz on window load (no need to wait for Firebase anymore)
+        window.onload = startQuiz;
     </script>
 </body>
 </html>
