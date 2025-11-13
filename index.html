@@ -154,7 +154,7 @@
     <!-- Removed Firebase SDK and setup script -->
 
     <script>
-        // --- QUIZ DATA (All 27 Questions) ---
+        // --- QUIZ DATA (All 27 Questions verified against CSV) ---
         const quizData = [
             {
                 id: 1,
@@ -334,7 +334,7 @@
             },
             {
                 id: 23,
-                question: "The compromised Domain User **sql.svc** (CredType: STANDARD, CredSource: implant_dump_lsass) on **braavos.essos.local** was linked to a Critical Sensitive Data Exposure on which specific SMB Share of the Domain Controller **meereen.essos.local**?",
+                question: "The compromised Domain User **sql.svc** (CredType: STANDARD, CredSource: implant_dump_lsass) on braavos.essos.local was linked to a Critical Sensitive Data Exposure on which specific SMB Share of the Domain Controller meereen.essos.local?",
                 answer: "SYSVOL",
                 score: 4,
                 hint: "The share containing Group Policy objects and scripts.",
