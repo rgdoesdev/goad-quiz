@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NodeZero GOAD Challenge</title>
+    <title>Gamified CTF Quiz</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Inter font -->
@@ -71,7 +71,7 @@
 
     <div id="app" class="w-full max-w-2xl container-card p-6 md:p-8 rounded-xl shadow-2xl transition-all duration-300">
         <h1 class="text-3xl md:text-4xl font-extrabold text-center mb-6 text-indigo-400">
-            NodeZero GOAD CTF Challenge
+            CTF Data Analysis Challenge
         </h1>
 
         <!-- Scoreboard and Progress -->
@@ -538,6 +538,8 @@
             // 5. Update Buttons
             document.getElementById('check-button').classList.remove('hidden');
             document.getElementById('next-button').classList.add('hidden');
+            // Ensure the next button is DISABLED when loading a new question
+            document.getElementById('next-button').disabled = true; 
             document.getElementById('restart-button').classList.add('hidden');
             document.getElementById('feedback-message').textContent = '';
         }
@@ -622,7 +624,10 @@
 
             // 3. Transition Buttons
             document.getElementById('check-button').classList.add('hidden');
-            document.getElementById('next-button').classList.remove('hidden');
+            const nextButton = document.getElementById('next-button');
+            nextButton.classList.remove('hidden');
+            // FIX APPLIED HERE: Using removeAttribute to guarantee the button is enabled
+            nextButton.removeAttribute('disabled'); 
         }
 
         function nextQuestion() {
@@ -659,4 +664,3 @@
     </script>
 </body>
 </html>
-
