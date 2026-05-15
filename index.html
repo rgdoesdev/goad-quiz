@@ -2,66 +2,103 @@
 <html>
 <head>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
-        .container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 350px; }
-        .dice-area { display: flex; justify-content: space-around; margin: 20px 0; }
-        .die { width: 120px; height: 120px; border: 2px solid #333; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; background: #fff; padding: 10px; box-sizing: border-box; font-size: 1.1rem; }
-        .label { font-size: 0.8rem; color: #666; margin-bottom: 5px; }
-        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: 0.2s; }
-        button:hover { background: #0056b3; }
-        #result-summary { margin-top: 20px; font-weight: bold; color: #2c3e50; min-height: 50px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #eef2f3; margin: 0; }
+        .container { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); text-align: center; width: 400px; }
+        
+        .dice-area { display: flex; justify-content: space-around; margin: 30px 0; }
+        .die { 
+            width: 140px; height: 140px; border: 3px solid #333; border-radius: 18px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; background: #fff; font-size: 1.2rem; transition: transform 0.1s;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05); color: #333;
+        }
+
+        /* The Shake Animation */
+        .shaking { animation: shake 0.15s infinite; color: #007bff; border-color: #007bff; }
+        @keyframes shake {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            20% { transform: translate(-1px, -2px) rotate(-1deg); }
+            40% { transform: translate(-3px, 0px) rotate(1deg); }
+            60% { transform: translate(3px, 2px) rotate(0deg); }
+            80% { transform: translate(1px, -1px) rotate(1deg); }
+            100% { transform: translate(-1px, 2px) rotate(-1deg); }
+        }
+
+        button { background: #28a745; color: white; border: none; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #status { margin-top: 15px; font-style: italic; color: #666; height: 20px; }
+        #summary { margin-top: 20px; font-size: 1.2rem; font-weight: bold; color: #d9534f; min-height: 60px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>✈️ Vacation Roulette</h2>
+    <p>The 10-Second Countdown to Fate</p>
     
     <div class="dice-area">
-        <div>
-            <div class="label">DESTINATION</div>
-            <div id="dest-die" class="die">?</div>
-        </div>
-        <div>
-            <div class="label">DURATION</div>
-            <div id="dur-die" class="die">?</div>
-        </div>
+        <div id="dest-die" class="die">READY</div>
+        <div id="dur-die" class="die">READY</div>
     </div>
 
-    <button onclick="rollDice()">Roll the Fate!</button>
-
-    <div id="result-summary"></div>
+    <button id="rollBtn" onclick="startLongRoll()">ROLL THE DICE</button>
+    <div id="status"></div>
+    <div id="summary"></div>
 </div>
 
 <script>
     const destinations = ["Portugal", "Portugal", "Italy", "Italy", "Spain", "Spain"];
-    const durations = ["5 Days", "7 Days", "9 Days", "10 Days", "10 Days + Another Country", "Retry Country"];
+    const durations = ["5 Days", "7 Days", "9 Days", "10 Days", "10 Days + Another", "Retry Country"];
 
-    function rollDice() {
+    function startLongRoll() {
         const destDie = document.getElementById('dest-die');
         const durDie = document.getElementById('dur-die');
-        const summary = document.getElementById('result-summary');
+        const btn = document.getElementById('rollBtn');
+        const summary = document.getElementById('summary');
+        const status = document.getElementById('status');
 
-        // Add a simple "shake" animation effect via text
-        destDie.innerText = "🎲";
-        durDie.innerText = "🎲";
+        // Reset UI
+        btn.disabled = true;
+        summary.innerText = "";
+        destDie.classList.add('shaking');
+        durDie.classList.add('shaking');
+        
+        let secondsLeft = 10;
+        status.innerText = `Deciding your future... (${secondsLeft}s)`;
 
+        // Interval to change text rapidly (the "blur" effect)
+        const rollInterval = setInterval(() => {
+            destDie.innerText = destinations[Math.floor(Math.random() * destinations.length)];
+            durDie.innerText = durations[Math.floor(Math.random() * durations.length)];
+        }, 100);
+
+        // Interval to update the countdown text every second
+        const countdownInterval = setInterval(() => {
+            secondsLeft--;
+            if(secondsLeft > 0) status.innerText = `Deciding your future... (${secondsLeft}s)`;
+        }, 1000);
+
+        // The Stop Logic (10 seconds)
         setTimeout(() => {
-            const finalDest = destinations[Math.floor(Math.random() * destinations.length)];
-            const finalDur = durations[Math.floor(Math.random() * durations.length)];
+            clearInterval(rollInterval);
+            clearInterval(countdownInterval);
+            
+            destDie.classList.remove('shaking');
+            durDie.classList.remove('shaking');
+            btn.disabled = false;
+            status.innerText = "THE RESULTS ARE IN!";
 
-            destDie.innerText = finalDest;
-            durDie.innerText = finalDur;
+            const finalDest = destDie.innerText;
+            const finalDur = durDie.innerText;
 
-            // Logic for special values
             if (finalDur === "Retry Country") {
-                summary.innerText = `You're going for ${finalDur}! Roll the destination again.`;
-            } else if (finalDur === "10 Days + Another Country") {
-                summary.innerText = `Pack your bags! ${finalDest} plus a mystery neighbor for 10+ days!`;
+                summary.innerText = `Fate says ${finalDur}! Keep the duration, but roll for a new country.`;
+            } else if (finalDur === "10 Days + Another") {
+                summary.innerText = `PACK HEAVY! ${finalDest} + another surprise country!`;
             } else {
-                summary.innerText = `Pack for ${finalDur} in ${finalDest}!`;
+                summary.innerText = `You're going to ${finalDest} for ${finalDur}!`;
             }
-        }, 300);
+        }, 10000); 
     }
 </script>
 
